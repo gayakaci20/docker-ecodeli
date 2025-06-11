@@ -1,0 +1,20 @@
+services:
+  admin-dashboard:
+    build: .
+    container_name: eco-admin-dashboard
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_URL=postgresql://eco_user:eco_password@eco-postgres:5432/eco_database
+      - DIRECT_URL=postgresql://eco_user:eco_password@eco-postgres:5432/eco_database
+      - NEXTAUTH_SECRET=your-super-secret-key-change-in-production
+      - NEXTAUTH_URL=http://localhost:3001
+    restart: unless-stopped
+    networks:
+      - eco-front_eco-network
+
+networks:
+  eco-front_eco-network:
+    external: true 
