@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # Base de données PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: eco-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: eco_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - eco-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eco_user -d eco_database"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis pour le cache
+  redis:
+    image: redis:7-alpine
+    container_name: eco-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - eco-network
+
+  # Application principale
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: eco-front-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@eco-postgres:5432/eco_db
+      - JWT_SECRET=your_jwt_secret_key_here_change_in_production
+      - STRIPE_SECRET_KEY=sk_test_fallback_key_for_build
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
+      - REDIS_URL=redis://eco-redis:6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - eco-network
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
+  admin:
+    build:
+      context: ./admin-dashboard
+      dockerfile: Dockerfile.dev
+    container_name: eco-admin-dashboard
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@eco-postgres:5432/eco_db
+      - DIRECT_URL=postgresql://postgres:password@eco-postgres:5432/eco_db
+      - NEXTAUTH_SECRET=your_nextauth_secret_here_change_in_production
+      - NEXTAUTH_URL=http://localhost:3001
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3001
+      - PORT=3001
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - eco-network
+    volumes:
+      - ./admin-dashboard:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  eco-network:
+    driver: bridge 
